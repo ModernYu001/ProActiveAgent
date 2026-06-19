@@ -1,0 +1,32 @@
+# ===== 机密：任何环境/密钥文件都不进仓库 =====
+.env
+**/.env
+*.env
+!.env.example
+**/*.key
+**/*secret*
+
+# ===== 本地数据/产物 =====
+*.db
+*.db-journal
+*.sqlite3
+**/proactive.db*
+web_out/
+**/web_out/
+logs/
+**/logs/
+
+# ===== Python =====
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+**/.venv/
+venv/
+.pytest_cache/
+
+# ===== 系统/编辑器 =====
+.DS_Store
+*.swp
+.idea/
+.vscode/

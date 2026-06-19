@@ -1,0 +1,167 @@
+# ProActive 资讯监控 Agent —— 主配置
+# 改这里就能调话题、频率、阈值和模型路由，无需改代码。
+
+# ---- 用户关注画像：判断层会把它喂给 LLM，作为"贴心理解你"的依据 ----
+user_profile: |
+  我关注 AI agent / 大模型行业。最想第一时间知道：
+  - GitHub 上 AI agent 领域真正在崛起的热点项目（不是旧项目的日常更新）。
+  - 重大时政新闻，尤其是突发事件。
+  - 全球值得关注的科技新闻，特别是 AI 行业的重要进展（新模型、重大发布、重要论文/收购）。
+  - AI 领域独角兽公司的新闻（融资、估值、重大动作）。
+  我讨厌：营销软文、旧闻翻炒、无信息量的标题党、同一件事被反复推送。
+
+# ---- 调度：每个话题的轮询间隔（分钟）。突发类调高频，慢话题降频 ----
+schedule:
+  default_interval_min: 30
+  critic_interval_hours: 24   # 后台评判/自省层多久复盘一次
+
+# ---- 打扰预算：强制系统学会取舍 ----
+budget:
+  max_instant_pushes_per_day: 8   # 每天最多即时推送条数
+  digest_hour: 8                  # "攒着"的条目在每天几点汇总成摘要(本地时间)
+
+# ---- 判断阈值（0-100）：>=push 立即推；>=digest 进摘要；否则丢弃 ----
+thresholds:
+  push: 72
+  digest: 50
+
+# ---- 模型路由 ----
+# 模型 id 均经 list_models.py 在你账号上实测存在。判断层走 flash-lite(约600/天)，
+# critic 用 2.5-flash(低频)。grok 对话接口暂有问题, 先不入路径(以后修好可做兜底)。
+models:
+  # 判断层（高频、量大）：优选 3.1-flash-lite, 逐级回退
+  judge:
+    provider: gemini
+    preferred: gemini-3.1-flash-lite
+    fallback:
+      - gemini-2.5-flash-lite
+      - gemini-2.5-flash
+      - gemini-3-flash-preview
+  # 摘要（当前未在热路径调用，保留占位）
+  summarize:
+    provider: gemini
+    preferred: gemini-2.5-flash
+    fallback:
+      - gemini-2.5-flash-lite
+  # 评判/自省层（低频、要稍强）：grok 主用, gemini 兜底
+  critic:
+    provider: grok
+    preferred: grok-4.20-fast
+    fallback:
+      - grok-4.20-0309-non-reasoning   # 同 provider 回退
+    fallback_provider: gemini
+    fallback_models:                   # grok 全挂了再用 gemini
+      - gemini-2.5-flash
+      - gemini-3-flash-preview
+
+# ---- 每日配额上限（每个 key/天）。本地按天计数，用尽自动降级，绝不超配额 ----
+# 你有 2 个 Gemini key → flash-lite 实际每天约 600 次；配合批量判断足够高频盯梢。
+quotas:
+  gemini:
+    gemini-3.1-flash-lite: 300   # 主力判断模型 (2 key → 约 600/天)
+    gemini-2.5-flash-lite: 100   # 兜底, 配额未确认先保守填
+    gemini-2.5-flash: 10         # 稀缺, 给 critic / 兜底
+    gemini-3-flash-preview: 10   # 稀缺, 兜底
+  grok:
+    grok: 40                     # 暂未入路径, 保留
+
+# ---- 判断层批处理：一次调用评分多条，省配额 ----
+judge:
+  batch_size: 15                 # Gemini 配额足, 15 条/批兼顾质量与省调用
+
+# ---- 监控话题 ----
+topics:
+  - id: github_ai_agents
+    name: "GitHub AI Agent 热点项目"
+    type: github_trending
+    enabled: true
+    # 命中这些 topic/关键词的仓库才纳入
+    queries:
+      - "topic:ai-agent"
+      - "topic:llm-agent"
+      - "topic:autonomous-agents"
+      - "ai agent framework"
+    top_n: 10
+    interval_min: 720   # 半天一次足够，热点项目不会分钟级变化
+
+  # 三个新闻话题：每个 = Tavily 高频(主力) + grok-X 每天1次(补充)。
+  # 两个源共享同一 name(显示合并)与 importance_hint(YAML 锚点复用)；去重会跨源合并同一事件。
+
+  # —— 时政 / 突发 ——
+  - id: politics_tavily
+    name: "时政 / 突发新闻"
+    type: tavily
+    enabled: true
+    tavily_topic: news
+    days: 1
+    max_results: 10
+    queries:
+      - "breaking news politics"
+      - "world politics geopolitics"
+    interval_min: 240   # 4h: 适配 Tavily 月额度(约 360 点/月)
+    importance_hint: &hint_pol "突发、重大政策、地缘冲突、选举结果优先；日常政情类降权。"
+  - id: politics_x
+    name: "时政 / 突发新闻"
+    type: grok_x
+    enabled: true
+    max_results: 8
+    queries:
+      - "breaking political news"
+      - "geopolitics"
+    interval_min: 1440  # grok 从 X 拉, 每天1次
+    importance_hint: *hint_pol
+
+  # —— 科技 / AI 行业 ——
+  - id: tech_tavily
+    name: "全球科技 / AI 行业新闻"
+    type: tavily
+    enabled: true
+    tavily_topic: news
+    days: 1
+    max_results: 10
+    queries:
+      - "artificial intelligence breakthrough"
+      - "AI model release"
+      - "OpenAI OR Anthropic OR Google DeepMind OR xAI"
+    interval_min: 480   # 8h: 约 270 点/月
+    importance_hint: &hint_tech "新模型发布、重大产品、重要论文、巨头战略、重大收购优先。"
+  - id: tech_x
+    name: "全球科技 / AI 行业新闻"
+    type: grok_x
+    enabled: true
+    max_results: 8
+    queries:
+      - "AI breaking news"
+      - "new AI model launch"
+    interval_min: 1440
+    importance_hint: *hint_tech
+
+  # —— AI 独角兽 ——
+  - id: unicorn_tavily
+    name: "AI 独角兽新闻"
+    type: tavily
+    enabled: true
+    tavily_topic: news
+    days: 2
+    max_results: 10
+    queries:
+      - "AI startup funding round"
+      - "AI unicorn valuation"
+      - "AI startup raises"
+    interval_min: 1440  # 1天: 约 90 点/月  (三者合计约 720/月 < 800 上限)
+    importance_hint: &hint_uni "大额融资、新晋独角兽、估值变化、重大并购优先。"
+  - id: unicorn_x
+    name: "AI 独角兽新闻"
+    type: grok_x
+    enabled: true
+    max_results: 8
+    queries:
+      - "AI startup funding"
+      - "AI unicorn"
+    interval_min: 1440
+    importance_hint: *hint_uni
+
+# ---- 去重 ----
+dedup:
+  title_similarity_threshold: 88   # 标题相似度(0-100)超过即视为同一事件
+  lookback_days: 7                 # 在最近几天的已见条目里比对
