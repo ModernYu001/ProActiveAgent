@@ -38,19 +38,23 @@ def fetch_tavily(topic: dict, llm=None) -> list[dict]:
     days = topic.get("days", 1)
     max_results = topic.get("max_results", 10)
     tav_topic = topic.get("tavily_topic", "news")   # news / general
+    depth = topic.get("search_depth", "basic")      # basic=1点 / advanced=2点
+    raw = bool(topic.get("include_raw_content", False))
+    cost = 2 if depth == "advanced" else 1
     items: list[dict] = []
     seen = set()
 
     for q in topic.get("queries", []):
-        if used >= limit:
-            print(f"[tavily] 本月额度已达 {used}/{limit}(80%上限), 暂停搜索至下月")
+        if used + cost > limit:
+            print(f"[tavily] 本月额度将超 {used}+{cost}>{limit}(80%上限), 暂停搜索至下月")
             break
         body = {
             "api_key": key,
             "query": q,
             "topic": tav_topic,
             "max_results": max_results,
-            "search_depth": "basic",
+            "search_depth": depth,
+            "include_raw_content": raw,
             "include_answer": False,
         }
         if tav_topic == "news":
@@ -65,10 +69,11 @@ def fetch_tavily(topic: dict, llm=None) -> list[dict]:
             print(f"[tavily] 请求失败: {e}")
             continue
 
-        # 计一次额度(成功调用即消耗 1 点)
-        used += 1
+        # 计额度(basic=1 / advanced=2 点)
+        used += cost
         with store.connect() as conn:
-            store.incr_usage(conn, month, "tavily", "search", 0)
+            for _ in range(cost):
+                store.incr_usage(conn, month, "tavily", "search", 0)
 
         for res in results:
             url = res.get("url", "")
@@ -83,5 +88,6 @@ def fetch_tavily(topic: dict, llm=None) -> list[dict]:
                 url=url,
                 content=res.get("content", ""),
                 published_at=res.get("published_date", "") or "",
+                content_full=res.get("raw_content", "") or "",   # advanced 带回的正文
             ))
     return items

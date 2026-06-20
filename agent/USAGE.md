@@ -36,9 +36,20 @@
 | `loop` | 常驻，按各话题间隔自动调度 + 每日自省 | 正式盯梢（= start.command） |
 | `test` | 向所有已启用渠道发一条测试消息 | 验证 Telegram/邮件/网页连通 |
 | `digest` | 把"攒着"的内容汇总成每日摘要发出 | 每天定时 / 手动 |
-| `review` | 立刻运行自省层，输出复盘 + 改进建议 | 跑满一天后看效果 |
-| `quota` | 看今天各模型/各 key 已用配额 | 担心配额时 |
-| `feedback <item_id> <signal>` | 记录反馈：accepted/opened/clicked/ignored/rejected | 觉得某条推送好/不好 |
+| `review` | 复盘 + 改进建议 + 提议新「关注画像」 | 跑满一天后看效果 |
+| `apply-profile` | 审批采纳自省层提议的新画像 | review 后觉得画像更新合理时 |
+| `quota` | 看各模型配额 + 本月 Tavily 点数 | 担心配额时 |
+| `feedback <item_id> <signal>` | 反馈 accepted/clicked/opened/ignored/rejected（同时更新来源采纳率）| 觉得某条推送好/不好 |
+
+### 判断机制：两段式 + 个性化（越用越懂你）
+
+- **两段式**：第一段标题+摘要批量**粗筛**（省调用），≥`triage_floor`(50) 才进第二段**读正文深判**（Tavily advanced 已带回正文，不额外抓页面），更准、理由有据。
+- **来源采纳率先验**：每条反馈更新该来源滑动平均采纳率，判断分按它加减最多 ±15。常采纳的源升权、常忽略的降权。
+- **自省重写画像**：`review` 基于反馈提议新 `user_profile` → `proposed_profile.txt`；`apply-profile` 采纳后写 `learned_profile.txt`，判断层优先用（删文件即回退）。
+- **15% 探索名额**：即时推送留 15% 给"重要但被降权最多"的内容，防信息茧房。
+- **限频/重试**：Gemini 按 `rate_limits`(设计 10 RPM/实际 15) 自动节流；429/网络异常自动等待重试（8/16/30/60s），重试耗尽才降级。
+
+> 相关参数在 `config.yaml` 的 `judge` / `personalize` / `rate_limits` 段。
 
 诊断脚本（不经 run.py）：`./.venv/bin/python list_models.py` —— 列出代理与 Gemini 上真实可用的模型 id，并自测 grok 连通。改完密钥/模型时用。
 

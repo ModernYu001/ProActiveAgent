@@ -1,4 +1,6 @@
 .env
+learned_profile.txt
+proposed_profile.txt
 *.db
 *.sqlite3
 __pycache__/

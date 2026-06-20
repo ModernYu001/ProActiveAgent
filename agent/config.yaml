@@ -17,8 +17,13 @@ schedule:
 
 # ---- 打扰预算：强制系统学会取舍 ----
 budget:
-  max_instant_pushes_per_day: 8   # 每天最多即时推送条数
+  max_instant_pushes_per_day: 8   # 仅 delivery.send_every_run=false 时生效(每日即时推送上限)
   digest_hour: 8                  # "攒着"的条目在每天几点汇总成摘要(本地时间)
+
+# ---- 投递策略 ----
+delivery:
+  send_every_run: true            # 每轮把本轮的推送条目直接发出(默认开), 不受每日预算限制
+  max_per_run: 15                 # 单轮最多发多少条(防消息过长), 超出降级进摘要
 
 # ---- 判断阈值（0-100）：>=push 立即推；>=digest 进摘要；否则丢弃 ----
 thresholds:
@@ -58,16 +63,34 @@ models:
 # 你有 2 个 Gemini key → flash-lite 实际每天约 600 次；配合批量判断足够高频盯梢。
 quotas:
   gemini:
-    gemini-3.1-flash-lite: 300   # 主力判断模型 (2 key → 约 600/天)
+    gemini-3.1-flash-lite: 450   # 主力判断 (每 key 500/天, 留余量按 450 → 2 key 约 900/天)
     gemini-2.5-flash-lite: 100   # 兜底, 配额未确认先保守填
     gemini-2.5-flash: 10         # 稀缺, 给 critic / 兜底
     gemini-3-flash-preview: 10   # 稀缺, 兜底
   grok:
-    grok: 40                     # 暂未入路径, 保留
+    grok: 40                     # grok-X 采集 + critic 兜底
 
-# ---- 判断层批处理：一次调用评分多条，省配额 ----
+# ---- 每分钟限频(RPM)：设计值取实际的 ~2/3 留余量。客户端自动节流 + 429 等待重试 ----
+rate_limits:
+  gemini:
+    gemini-3.1-flash-lite: 10    # 实际 15
+    gemini-2.5-flash-lite: 10
+    gemini-2.5-flash: 3          # 实际 5
+    gemini-3-flash-preview: 3    # 实际 5
+
+# ---- 判断层：两段式(粗筛→读正文深判) ----
 judge:
-  batch_size: 15                 # Gemini 配额足, 15 条/批兼顾质量与省调用
+  batch_size: 15                 # 第一段粗筛: 标题+摘要, 批量
+  triage_floor: 50               # 第一段≥此分才进第二段读正文(=digest线, 省调用)
+  deep_max_chars: 4000           # 第二段喂模型的正文截断长度
+  # 限频由 rate_limits(RPM) 统一节流, 此处无需额外 sleep
+
+# ---- 个性化：越用越懂你 ----
+personalize:
+  source_prior_weight: 15        # 来源采纳率先验对分数的最大加减(±15)
+  ema_alpha: 0.2                 # 来源采纳率滑动平均更新速率
+  exploration_ratio: 0.15        # 即时推送名额里留给"高重要性但偏离口味"的探索比例
+  explore_floor: 80              # 原始重要性≥此分者视为"高价值", 可进探索名额
 
 # ---- 监控话题 ----
 topics:
@@ -93,12 +116,14 @@ topics:
     type: tavily
     enabled: true
     tavily_topic: news
+    search_depth: advanced       # 带回正文 raw_content, 供第二段深判; 每查询 2 点
+    include_raw_content: true
     days: 1
     max_results: 10
     queries:
       - "breaking news politics"
       - "world politics geopolitics"
-    interval_min: 240   # 4h: 适配 Tavily 月额度(约 360 点/月)
+    interval_min: 720   # 2次/天 (advanced 2点 × 2查询 × 2次 × 30 = 240 点/月)
     importance_hint: &hint_pol "突发、重大政策、地缘冲突、选举结果优先；日常政情类降权。"
   - id: politics_x
     name: "时政 / 突发新闻"
@@ -117,13 +142,14 @@ topics:
     type: tavily
     enabled: true
     tavily_topic: news
+    search_depth: advanced
+    include_raw_content: true
     days: 1
     max_results: 10
     queries:
-      - "artificial intelligence breakthrough"
-      - "AI model release"
+      - "AI model release breakthrough"
       - "OpenAI OR Anthropic OR Google DeepMind OR xAI"
-    interval_min: 480   # 8h: 约 270 点/月
+    interval_min: 720   # 2次/天 (约 240 点/月)
     importance_hint: &hint_tech "新模型发布、重大产品、重要论文、巨头战略、重大收购优先。"
   - id: tech_x
     name: "全球科技 / AI 行业新闻"
@@ -142,13 +168,14 @@ topics:
     type: tavily
     enabled: true
     tavily_topic: news
+    search_depth: advanced
+    include_raw_content: true
     days: 2
     max_results: 10
     queries:
-      - "AI startup funding round"
+      - "AI startup funding round OR raises"
       - "AI unicorn valuation"
-      - "AI startup raises"
-    interval_min: 1440  # 1天: 约 90 点/月  (三者合计约 720/月 < 800 上限)
+    interval_min: 720   # 2次/天 (约 240 点/月; 三者合计约 720/月 < 800 上限)
     importance_hint: &hint_uni "大额融资、新晋独角兽、估值变化、重大并购优先。"
   - id: unicorn_x
     name: "AI 独角兽新闻"

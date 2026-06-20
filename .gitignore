@@ -6,6 +6,12 @@
 **/*.key
 **/*secret*
 
+# ===== 本地个性化状态(每个用户私有, 不进仓库) =====
+learned_profile.txt
+**/learned_profile.txt
+proposed_profile.txt
+**/proposed_profile.txt
+
 # ===== 本地数据/产物 =====
 *.db
 *.db-journal

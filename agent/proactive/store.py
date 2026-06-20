@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS reviews (         -- 评判/自省层产出
     applied INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS source_stats (    -- 来源采纳率(个性化先验)
+    source TEXT PRIMARY KEY,
+    ema REAL DEFAULT 0.5,        -- 滑动平均采纳率 0..1
+    n INTEGER DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS usage (           -- LLM 日调用配额计数
     day TEXT,                     -- YYYY-MM-DD (本地)
     provider TEXT,
@@ -150,6 +156,32 @@ def save_review(conn, period_start: float, period_end: float, report: str, sugge
            VALUES (?,?,?,?,?)""",
         (time.time(), period_start, period_end, report, json.dumps(suggestions, ensure_ascii=False)),
     )
+
+
+def get_source_ema(conn, source: str) -> float:
+    cur = conn.execute("SELECT ema FROM source_stats WHERE source = ?", (source,))
+    row = cur.fetchone()
+    return row["ema"] if row else 0.5      # 无历史 → 中性 0.5
+
+
+def update_source_ema(conn, source: str, reward: float, alpha: float):
+    """reward∈[0,1]: 采纳=1 / 点击=0.8 / 打开=0.6 / 忽略=0.2 / 否决=0。"""
+    cur = conn.execute("SELECT ema, n FROM source_stats WHERE source = ?", (source,))
+    row = cur.fetchone()
+    if row:
+        ema = (1 - alpha) * row["ema"] + alpha * reward
+        n = row["n"] + 1
+        conn.execute("UPDATE source_stats SET ema = ?, n = ? WHERE source = ?", (ema, n, source))
+    else:
+        ema = (1 - alpha) * 0.5 + alpha * reward
+        conn.execute("INSERT INTO source_stats (source, ema, n) VALUES (?,?,1)", (source, ema))
+    return ema
+
+
+def top_source_stats(conn, limit: int = 30) -> list[dict]:
+    cur = conn.execute(
+        "SELECT source, ema, n FROM source_stats WHERE n > 0 ORDER BY n DESC LIMIT ?", (limit,))
+    return [dict(r) for r in cur.fetchall()]
 
 
 def get_usage(conn, day: str, provider: str, model: str, key_idx: int) -> int:

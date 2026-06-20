@@ -46,7 +46,22 @@ class LLMClient:
 
         # 配额表：{provider: {model: per_key_daily_limit}}；None=不限(用于自测脚本)
         self.quotas = (cfg or {}).get("quotas") if cfg else None
+        # 每分钟限频(RPM){provider:{model:rpm}}, 设计值取实际的 ~2/3 留余量
+        self.rate_limits = (cfg or {}).get("rate_limits", {}) if cfg else {}
+        self._last_call = {}   # (provider, model, key_idx) -> 上次调用时间戳
         self.timeout = 60
+
+    def _throttle(self, provider: str, model: str, key_idx: int):
+        """按 RPM 限频：与上次同 (model,key) 调用间隔不足则 sleep 补足。"""
+        rpm = self.rate_limits.get(provider, {}).get(model)
+        if not rpm:
+            return
+        min_interval = 60.0 / rpm
+        k = (provider, model, key_idx)
+        wait = min_interval - (time.time() - self._last_call.get(k, 0.0))
+        if wait > 0:
+            time.sleep(wait)
+        self._last_call[k] = time.time()
 
     # ---------- 配额 ----------
     def _limit(self, provider: str, model: str) -> int | None:
@@ -118,19 +133,34 @@ class LLMClient:
             "contents": [{"role": "user", "parts": [{"text": user}]}],
             "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
         }
-        r = requests.post(url, json=body, timeout=self.timeout)
-        if r.status_code == 429:
-            # 远端也限流：本地直接标记用满, 避免再撞
-            self._mark_exhausted("gemini", model, key_idx)
-            raise QuotaExhausted(f"gemini:{model} key#{key_idx} 远端 429 限流")
-        if r.status_code != 200:
+        # 429(限频/瞬时) 与网络异常 → 等待重试; 重试耗尽再标记当日用尽并回退
+        backoffs = [8, 16, 30, 60]
+        for attempt in range(len(backoffs) + 1):
+            self._throttle("gemini", model, key_idx)   # 先按 RPM 节流
+            try:
+                r = requests.post(url, json=body, timeout=self.timeout)
+            except Exception as e:  # noqa: BLE001 网络瞬时异常 → 重试
+                if attempt < len(backoffs):
+                    print(f"[gemini] {model} 网络异常, 等待 {backoffs[attempt]}s 重试…")
+                    time.sleep(backoffs[attempt])
+                    continue
+                raise LLMError(f"gemini 网络多次失败: {e}")
+            if r.status_code == 200:
+                self._count("gemini", model, key_idx)
+                data = r.json()
+                try:
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    raise LLMError(f"无法解析 Gemini 响应: {json.dumps(data)[:200]}")
+            if r.status_code == 429:
+                if attempt < len(backoffs):
+                    print(f"[gemini] {model} 429 限流, 等待 {backoffs[attempt]}s 重试…")
+                    time.sleep(backoffs[attempt])
+                    continue
+                self._mark_exhausted("gemini", model, key_idx)   # 多次仍 429=当日用尽
+                raise QuotaExhausted(f"gemini:{model} key#{key_idx} 429 重试耗尽")
             raise LLMError(f"HTTP {r.status_code}: {r.text[:200]}")
-        self._count("gemini", model, key_idx)
-        data = r.json()
-        try:
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        except (KeyError, IndexError):
-            raise LLMError(f"无法解析 Gemini 响应: {json.dumps(data)[:200]}")
+        raise LLMError("gemini 未知失败")
 
     def _mark_exhausted(self, provider: str, model: str, key_idx: int):
         limit = self._limit(provider, model) or 9999
