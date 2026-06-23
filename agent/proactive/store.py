@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS reviews (         -- 评判/自省层产出
     applied INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS github_stars (    -- 追踪仓库星标, 用于检测"激增"热点
+    repo TEXT PRIMARY KEY,
+    stars INTEGER,
+    updated REAL
+);
+
 CREATE TABLE IF NOT EXISTS source_stats (    -- 来源采纳率(个性化先验)
     source TEXT PRIMARY KEY,
     ema REAL DEFAULT 0.5,        -- 滑动平均采纳率 0..1
@@ -156,6 +162,17 @@ def save_review(conn, period_start: float, period_end: float, report: str, sugge
            VALUES (?,?,?,?,?)""",
         (time.time(), period_start, period_end, report, json.dumps(suggestions, ensure_ascii=False)),
     )
+
+
+def get_repo_stars(conn, repo: str):
+    cur = conn.execute("SELECT stars FROM github_stars WHERE repo = ?", (repo,))
+    row = cur.fetchone()
+    return row["stars"] if row else None
+
+
+def set_repo_stars(conn, repo: str, stars: int):
+    conn.execute("INSERT OR REPLACE INTO github_stars (repo, stars, updated) VALUES (?,?,?)",
+                 (repo, stars, time.time()))
 
 
 def get_source_ema(conn, source: str) -> float:

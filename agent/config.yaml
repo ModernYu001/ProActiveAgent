@@ -98,14 +98,40 @@ topics:
     name: "GitHub AI Agent 热点项目"
     type: github_trending
     enabled: true
-    # 命中这些 topic/关键词的仓库才纳入
+    # AI 相关热点：抓"新锐项目 + 星标激增", 而非历史最高星
     queries:
       - "topic:ai-agent"
       - "topic:llm-agent"
       - "topic:autonomous-agents"
+      - "topic:llm"
+      - "topic:mcp"
+      - "topic:rag"
       - "ai agent framework"
+    created_within_days: 120   # "新项目"判定: 近 N 天创建
+    surge_min_stars: 200       # 距上次抓取涨星≥此数 → 视为热点激增
+    track_pool: 30             # 每个查询追踪前 N 个高星仓库(用于检测激增)
+    top_n: 12
+    interval_min: 720   # 半天一次足够，热点不会分钟级变化
+
+  - id: github_companion
+    name: "GitHub AI 陪伴机器人热点"
+    type: github_trending
+    enabled: true
+    # 用主题标签精准命中 AI 情感陪伴/数字人项目(关键词 companion 噪音大)
+    queries:
+      - "topic:ai-companion"
+      - "topic:ai-waifu"
+      - "topic:character-ai"
+      - "topic:ai-vtuber"
+      - "topic:virtual-girlfriend"
+      - "topic:digital-human"
+      - "AI companion"
+    created_within_days: 180   # 该领域较新, 窗口放宽
+    surge_min_stars: 100       # 体量比主流 AI 小, 激增门槛调低
+    track_pool: 30
     top_n: 10
-    interval_min: 720   # 半天一次足够，热点项目不会分钟级变化
+    importance_hint: "AI 情感陪伴/虚拟伴侣/数字人/角色扮演项目优先；新框架、新玩法、快速涨星优先；纯书籍/工具类被命名为 companion 的噪音降权。"
+    interval_min: 720
 
   # 三个新闻话题：每个 = Tavily 高频(主力) + grok-X 每天1次(补充)。
   # 两个源共享同一 name(显示合并)与 importance_hint(YAML 锚点复用)；去重会跨源合并同一事件。

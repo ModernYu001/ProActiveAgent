@@ -31,6 +31,10 @@ class QuotaExhausted(LLMError):
     pass
 
 
+class UpstreamError(LLMError):   # 代理上游返回错误(如 403): 不可重试, 立即失败
+    pass
+
+
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -225,11 +229,18 @@ class LLMClient:
                     break
                 try:
                     obj = json.loads(data)
-                    delta = obj["choices"][0].get("delta", {})
-                    piece = delta.get("content") or ""
+                except json.JSONDecodeError:
+                    continue
+                # 流里裹着的上游错误(如 403): 立即抛出, 不当空响应去重试
+                if isinstance(obj, dict) and obj.get("error"):
+                    err = obj["error"]
+                    msg = err.get("message") if isinstance(err, dict) else str(err)
+                    raise UpstreamError(f"grok 上游错误: {msg}")
+                try:
+                    piece = obj["choices"][0].get("delta", {}).get("content") or ""
                     if piece:
                         parts.append(piece)
-                except (json.JSONDecodeError, KeyError, IndexError):
+                except (KeyError, IndexError):
                     continue
         return "".join(parts)
 

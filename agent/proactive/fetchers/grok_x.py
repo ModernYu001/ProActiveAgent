@@ -31,10 +31,11 @@ def fetch_grok_x(topic: dict, llm=None) -> list[dict]:
     }
     user = (f"主题/关键词：{queries}\n额外侧重：{hint}\n"
             f"最多 {n} 条，按重要性排序。")
+    tid = topic.get("id", "?")
     try:
         out = llm.complete_json(route, GROK_X_SYSTEM, user, temperature=0.1, max_tokens=3000)
     except Exception as e:  # noqa: BLE001
-        print(f"[grok_x] 拉取失败(可能代理未开启实时 X 访问): {e}")
+        print(f"[grok_x:{tid}] 拉取失败(grok 多次空响应, 本轮跳过, 不影响其他源): {e}")
         return []
 
     items: list[dict] = []

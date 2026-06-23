@@ -1,6 +1,9 @@
-"""GitHub AI Agent 热点项目采集。
+"""GitHub AI 热点项目采集。
 
-用 GitHub Search API 找近期高星 / 快速涨星的 agent 相关仓库。
+抓"真正的热点"而非"历史最高星"——两类信号：
+  ① 近期新创建的高星项目（新锐）。
+  ② 已追踪项目的**星标激增**（trending 的本质；按周可重现，不被永久去重）。
+靠本地 github_stars 表对比上次星标数来检测激增。
 无 token 也能跑(速率较低)；配置 GITHUB_TOKEN 可提高上限。
 """
 from __future__ import annotations
@@ -10,6 +13,7 @@ from datetime import datetime, timedelta
 
 import requests
 
+from .. import store
 from .base import make_item
 
 SEARCH_API = "https://api.github.com/search/repositories"
@@ -21,52 +25,52 @@ def fetch_github_trending(topic: dict, llm=None) -> list[dict]:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    # 近 180 天有更新、按星标排序，逼近"当前热点"
-    pushed_since = (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d")
+    created_days = topic.get("created_within_days", 120)
+    surge_min = topic.get("surge_min_stars", 200)
     top_n = topic.get("top_n", 10)
-    items: list[dict] = []
+    pool = topic.get("track_pool", 30)            # 每查询追踪多少仓库
+    created_since = (datetime.utcnow() - timedelta(days=created_days)).strftime("%Y-%m-%d")
+    week = datetime.utcnow().strftime("%Y-W%U")   # 激增条目按周分桶
+    new_items, surge_items = [], []
     seen = set()
 
     for q in topic.get("queries", []):
-        query = f"{q} pushed:>{pushed_since}"
         try:
             r = requests.get(
                 SEARCH_API,
-                params={"q": query, "sort": "stars", "order": "desc", "per_page": top_n},
-                headers=headers,
-                timeout=30,
-            )
+                params={"q": f"{q} pushed:>{created_since}", "sort": "stars",
+                        "order": "desc", "per_page": pool},
+                headers=headers, timeout=30)
             if r.status_code != 200:
                 continue
             repos = r.json().get("items", [])
         except Exception:
             continue
 
-        for repo in repos:
-            url = repo.get("html_url", "")
-            if not url or url in seen:
-                continue
-            seen.add(url)
-            stars = repo.get("stargazers_count", 0)
-            desc = repo.get("description") or ""
-            item = make_item(
-                topic_id=topic["id"],
-                source="GitHub",
-                title=f"{repo.get('full_name')} (★{stars})",
-                url=url,
-                content=f"{desc}\nstars={stars}, language={repo.get('language')}, "
-                        f"updated={repo.get('pushed_at')}",
-                published_at=repo.get("created_at", ""),
-            )
-            items.append(item)
+        with store.connect() as conn:
+            for repo in repos:
+                full = repo.get("full_name", "")
+                url = repo.get("html_url", "")
+                if not url or full in seen:
+                    continue
+                seen.add(full)
+                stars = repo.get("stargazers_count", 0)
+                desc = repo.get("description") or ""
+                created = (repo.get("created_at") or "")[:10]
+                is_new = created >= created_since
+                prev = store.get_repo_stars(conn, full)
+                store.set_repo_stars(conn, full, stars)
+                delta = (stars - prev) if prev is not None else 0
+                meta = f"{desc}\nstars={stars}, +{delta} since last, language={repo.get('language')}, created={created}"
 
-    # 全局按星标粗排，截断 top_n
-    items.sort(key=lambda x: _stars(x), reverse=True)
-    return items[: top_n]
+                if prev is None and is_new:                    # ① 首次见到的新锐项目
+                    new_items.append(make_item(
+                        topic["id"], "GitHub", f"{full} (★{stars}, 新项目)", url, meta, created))
+                elif prev is not None and delta >= surge_min:  # ② 星标激增
+                    surge_items.append((delta, make_item(
+                        topic["id"], "GitHub", f"{full} 🔥 +{delta}★ (现 {stars})", url, meta,
+                        created, id_seed=f"{url}#surge-{week}")))
 
-
-def _stars(item: dict) -> int:
-    try:
-        return int(item["content"].split("stars=")[1].split(",")[0])
-    except (IndexError, ValueError):
-        return 0
+    surge_items.sort(key=lambda x: x[0], reverse=True)         # 涨得猛的优先
+    out = [it for _, it in surge_items] + new_items
+    return out[:top_n]

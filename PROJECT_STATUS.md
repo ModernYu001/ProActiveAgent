@@ -25,7 +25,8 @@
 
 | 话题 | 源 | 频率 | 备注 |
 |---|---|---|---|
-| GitHub AI Agent 热点 | GitHub Search API | 12h | 按星标取 Top10 |
+| GitHub AI Agent 热点 | GitHub Search API | 12h | **新锐项目 + 星标激增**(非历史最高星) |
+| GitHub AI 陪伴机器人热点 | GitHub Search API | 12h | 主题标签命中(ai-companion/waifu/character-ai 等) + 新锐/激增 |
 | 时政 / 突发 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | advanced 带回正文 |
 | 科技 / AI 行业 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | |
 | AI 独角兽 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | |
