@@ -1,7 +1,8 @@
-"""交付渠道适配器：邮件 / Telegram / 网页。按 .env 开关决定启用哪些。"""
+"""交付渠道适配器：邮件 / Telegram / Slack / 网页。按 .env 开关决定启用哪些。"""
 import os
 
 from .email_ch import send_email
+from .slack_ch import send_slack
 from .telegram_ch import send_telegram
 from .web_ch import publish_web
 
@@ -18,6 +19,9 @@ def deliver_all(subject: str, html: str, text: str, web_payload: dict | None = N
     if os.getenv("TELEGRAM_ENABLED", "false").lower() == "true":
         if send_telegram(tg or text):
             sent.append("telegram")
+    if os.getenv("SLACK_ENABLED", "false").lower() == "true":
+        if send_slack(text, subject):
+            sent.append("slack")
     if os.getenv("WEB_ENABLED", "false").lower() == "true" and web_payload is not None:
         if publish_web(web_payload):
             sent.append("web")

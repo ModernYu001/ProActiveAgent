@@ -1,0 +1,62 @@
+name: ProActive Agent
+
+on:
+  schedule:
+    - cron: "0 0,12 * * *"   # UTC 00:00 / 12:00 = 北京 08:00 / 20:00
+  workflow_dispatch:           # 允许手动触发
+
+concurrency:
+  group: proactive-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r agent/requirements.txt
+
+      # 恢复上次运行的状态库(去重记录+配额计数)。cache 未命中(首跑/被清)则从空库开始。
+      - name: Restore state db
+        uses: actions/cache/restore@v4
+        with:
+          path: agent/proactive.db
+          key: proactive-db-${{ github.run_id }}
+          restore-keys: proactive-db-
+
+      - name: Run one round
+        working-directory: agent
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          GROK_BASE_URL: ${{ secrets.GROK_BASE_URL }}
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GROK_MODEL: grok-4.20-fast
+          GROK_STREAM: "true"
+          GROK_MAX_ATTEMPTS: "6"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # Actions 自带临时 token, 够用于 Search API
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TAVILY_MONTHLY_CREDITS: "1000"
+          TAVILY_BUDGET_RATIO: "0.8"
+          EMAIL_ENABLED: "false"
+          TELEGRAM_ENABLED: "true"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SLACK_ENABLED: "true"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          WEB_ENABLED: "false"    # 云上不生成静态网页
+        run: python run.py once
+
+      # 无论成败都保存状态库, 供下次运行对比去重
+      - name: Save state db
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: agent/proactive.db
+          key: proactive-db-${{ github.run_id }}
