@@ -22,6 +22,10 @@ X 算法口味(按此优化, 这是实证规律):
 - 只使用素材中给出的事实, 严禁编造数字、调研、案例或引语; 观点可以尖锐, 事实必须有源
 - 每条不超过 240 字, 中文口语化, 短句多留白, 一条只讲一个点
 - 不用 hashtag, 不堆 emoji, 不做标题党(钩子必须被素材事实支撑)
+- 禁用 AI 味口水词: 炸裂、刷新认知、格局、赛道、狂热、掰手腕、重磅、天花板、拉满
+- 不要自行做倍数、排名、增长率等换算或跨素材对比——只引用素材里原有的数字
+- 三条草稿的结构和结尾必须各不相同: 一条以锐利判断收尾、一条以具体问题收尾、
+  一条以"这意味着什么"的推演收尾; 不要每条都用"你觉得…吗?"
 
 输出格式: 每条草稿 = 正文, 然后单独一行"评论区补链: <来源URL>"。
 草稿之间用单独一行 --- 分隔, 不要编号和其他说明文字。"""
@@ -44,7 +48,7 @@ def make_drafts(llm, cfg: dict, items: list[dict]) -> bool:
             f"从中挑最适合发推的角度，写 {n} 条草稿。")
     route = cfg.get("models", {}).get("drafts") or cfg["models"]["summarize"]
     try:
-        text = llm.complete(route, SYSTEM, user, temperature=0.7, max_tokens=1200)
+        text = llm.complete(route, SYSTEM, user, temperature=0.7, max_tokens=4000)
     except Exception as e:  # noqa: BLE001
         print(f"[drafts] 生成失败: {e}")
         return False
