@@ -8,6 +8,8 @@ user_profile: |
   - 重大时政新闻，尤其是突发事件。
   - 全球值得关注的科技新闻，特别是 AI 行业的重要进展（新模型、重大发布、重要论文/收购）。
   - AI 领域独角兽公司的新闻（融资、估值、重大动作）。
+  - Claude / Codex / Gemini 等 AI 工具的实用玩法、新功能、免费额度和羊毛机会。
+  - 用 AI 做出真实收入或增长的成功案例（必须有具体数字，如 MRR、用户数）。
   我讨厌：营销软文、旧闻翻炒、无信息量的标题党、同一件事被反复推送。
 
 # ---- 调度：每个话题的轮询间隔（分钟）。突发类调高频，慢话题降频 ----
@@ -213,6 +215,19 @@ topics:
       - "AI unicorn"
     interval_min: 1440
     importance_hint: *hint_uni
+
+  # —— AI 工具玩法 / 羊毛 / 成功案例（X 上最容易起量的内容型素材, 专供推文草稿）——
+  - id: ai_tools_x
+    name: "AI 工具玩法 / 羊毛 / 案例"
+    type: grok_x
+    enabled: true
+    max_results: 10
+    queries:
+      - "Claude Code OR Codex OR Gemini CLI tips workflow viral"
+      - "AI tool free tier credits promo deal"
+      - "built with AI MRR revenue indie hacker success"
+    interval_min: 720   # 每天2次: 这类内容在 X 上迭代快 (3查询×2次=6 次 grok/天)
+    importance_hint: "可复制的实操玩法/工作流、免费额度或羊毛机会、带真实数字(收入/用户数)的成功案例优先；纯营销吹捧、无细节复述降权。"
 
 # ---- 去重 ----
 dedup:
