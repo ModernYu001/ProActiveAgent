@@ -218,3 +218,9 @@ topics:
 dedup:
   title_similarity_threshold: 88   # 标题相似度(0-100)超过即视为同一事件
   lookback_days: 7                 # 在最近几天的已见条目里比对
+
+# ---- 推文草稿：每轮推送后, 把高分条目写成 X 草稿发到 Slack(仅草稿, 不自动发推) ----
+drafts:
+  enabled: true
+  count: 3              # 每轮生成几条草稿
+  max_source_items: 6   # 最多取本轮前几名条目当素材

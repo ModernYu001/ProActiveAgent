@@ -83,6 +83,11 @@ def cmd_once(cfg, llm):
 
     if to_push:
         _push_now(to_push)
+        try:
+            from proactive.drafts import make_drafts
+            make_drafts(llm, cfg, to_push)
+        except Exception as e:  # noqa: BLE001  草稿是锦上添花, 失败不影响主流程
+            print(f"[drafts] 跳过: {e}")
     else:
         print("本轮无达到推送阈值的内容。")
     print(f"摘要队列累计 {len(all_digest)} 条(将于每日 digest 时段汇总)。")
