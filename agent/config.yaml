@@ -8,7 +8,7 @@ user_profile: |
   - 重大时政新闻，尤其是突发事件。
   - 全球值得关注的科技新闻，特别是 AI 行业的重要进展（新模型、重大发布、重要论文/收购）。
   - AI 领域独角兽公司的新闻（融资、估值、重大动作）。
-  - Claude / Codex / Gemini 等 AI 工具的实用玩法、新功能、免费额度和羊毛机会。
+  - Claude / Codex / Gemini 等 AI 工具的实用玩法、新功能、免费额度和羊毛机会（免费 API 额度、兑换码、云厂商 AI 赠金等）。
   - 用 AI 做出真实收入或增长的成功案例（必须有具体数字，如 MRR、用户数）。
   我讨厌：营销软文、旧闻翻炒、无信息量的标题党、同一件事被反复推送。
 
@@ -218,16 +218,44 @@ topics:
 
   # —— AI 工具玩法 / 羊毛 / 成功案例（X 上最容易起量的内容型素材, 专供推文草稿）——
   - id: ai_tools_x
-    name: "AI 工具玩法 / 羊毛 / 案例"
+    name: "AI 工具玩法 / 案例"
     type: grok_x
     enabled: true
     max_results: 10
     queries:
       - "Claude Code OR Codex OR Gemini CLI tips workflow viral"
-      - "AI tool free tier credits promo deal"
       - "built with AI MRR revenue indie hacker success"
     interval_min: 720   # 每天2次: 这类内容在 X 上迭代快 (3查询×2次=6 次 grok/天)
-    importance_hint: "可复制的实操玩法/工作流、免费额度或羊毛机会、带真实数字(收入/用户数)的成功案例优先；纯营销吹捧、无细节复述降权。"
+    importance_hint: "可复制的实操玩法/工作流、带真实数字(收入/用户数)的成功案例优先；纯营销吹捧、无细节复述降权。"
+
+  # —— 🎁 AI 羊毛与福利 ——
+  - id: ai_deals_tavily
+    name: "🎁 AI 羊毛与福利"
+    type: tavily
+    enabled: true
+    tavily_topic: news
+    search_depth: advanced
+    include_raw_content: true
+    days: 2
+    max_results: 10
+    queries:
+      - "AI free credits promo code"
+      - "free API credits LLM deal"
+      - "OpenAI OR Anthropic OR Google Cloud free AI credits"
+    interval_min: 720
+    importance_hint: &hint_deals "免费 API 额度、兑换码、云厂商 AI 赠金、限时免费工具、大模型免费福利优先；过期优惠、普通收费软文降权。"
+  - id: ai_deals_x
+    name: "🎁 AI 羊毛与福利"
+    type: grok_x
+    enabled: true
+    max_results: 8
+    queries:
+      - "AI free tier credits promo"
+      - "free API key LLM deal"
+      - "AI 羊毛 免费额度"
+    interval_min: 1440
+    importance_hint: *hint_deals
+
 
 # ---- 去重 ----
 dedup:
