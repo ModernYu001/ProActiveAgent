@@ -54,6 +54,7 @@ class LLMClient:
         self.rate_limits = (cfg or {}).get("rate_limits", {}) if cfg else {}
         self._last_call = {}   # (provider, model, key_idx) -> 上次调用时间戳
         self.timeout = 60
+        self.grok_timeout = int(os.getenv("GROK_TIMEOUT", "150"))   # grok 实时搜索较慢, 单独放宽
 
     def _throttle(self, provider: str, model: str, key_idx: int):
         """按 RPM 限频：与上次同 (model,key) 调用间隔不足则 sleep 补足。"""
@@ -190,15 +191,19 @@ class LLMClient:
                          {"role": "user", "content": user}],
             "temperature": temperature, "max_tokens": max_tokens, "stream": stream,
         }
+        # 实时搜索：Grok2API 未声明工具时 tool_choice=none, 模型禁止搜索(只能用训练数据)。
+        # 必须带上搜索工具才能拿到实时信息(而非编造旧闻)。GROK_WEB_SEARCH=false 可关。
+        if os.getenv("GROK_WEB_SEARCH", "true").lower() == "true":
+            body["tools"] = [{"type": "web_search"}]
         # 空响应自动重试：最多 N 次, 拿到非空即返回。空响应不计配额(仅成功才 _count)。
         attempts = int(os.getenv("GROK_MAX_ATTEMPTS", "3"))
         last = "空响应"
         for i in range(max(1, attempts)):
             try:
                 if stream:
-                    text = self._grok_stream(url, headers, body)
+                    text = self._grok_stream(url, headers, body, timeout=self.grok_timeout)
                 else:
-                    r = requests.post(url, json=body, headers=headers, timeout=self.timeout)
+                    r = requests.post(url, json=body, headers=headers, timeout=self.grok_timeout)
                     if r.status_code != 200:
                         raise LLMError(f"HTTP {r.status_code}: {r.text[:200]}")
                     text = r.json()["choices"][0]["message"]["content"]
@@ -214,9 +219,10 @@ class LLMClient:
                 last = str(e)
         raise LLMError(f"grok 连续 {attempts} 次未取到内容: {last}")
 
-    def _grok_stream(self, url: str, headers: dict, body: dict) -> str:
+    def _grok_stream(self, url: str, headers: dict, body: dict, timeout: int | None = None) -> str:
         """解析 OpenAI 风格 SSE 流，拼出完整文本。"""
-        r = requests.post(url, json=body, headers=headers, timeout=self.timeout, stream=True)
+        r = requests.post(url, json=body, headers=headers,
+                          timeout=timeout or self.timeout, stream=True)
         if r.status_code != 200:
             raise LLMError(f"HTTP {r.status_code}: {r.text[:200]}")
         r.encoding = "utf-8"   # 代理未声明 charset 时 requests 默认 latin-1, 会乱码

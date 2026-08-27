@@ -39,7 +39,9 @@ jobs:
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           GROK_MODEL: grok-4.6
           GROK_STREAM: "true"
-          GROK_MAX_ATTEMPTS: "2"
+          GROK_MAX_ATTEMPTS: "1"
+          GROK_TIMEOUT: "150"
+          GROK_WEB_SEARCH: "true"   # 声明 web_search 工具, 否则 grok 无实时搜索只会编造旧闻
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # Actions 自带临时 token, 够用于 Search API
           TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}   # 多 key 逗号分隔, 自动分担
           TAVILY_MONTHLY_CREDITS: "1000"
