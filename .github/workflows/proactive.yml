@@ -43,7 +43,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # Actions 自带临时 token, 够用于 Search API
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           TAVILY_MONTHLY_CREDITS: "1000"
-          TAVILY_BUDGET_RATIO: "0.8"
+          TAVILY_BUDGET_RATIO: "1.0"
           EMAIL_ENABLED: "false"
           TELEGRAM_ENABLED: "true"
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
