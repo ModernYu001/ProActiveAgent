@@ -153,8 +153,7 @@ topics:
     max_results: 10
     queries:
       - "breaking news politics"
-      - "world politics geopolitics"
-    interval_min: 720   # 2次/天 (advanced 2点 × 2查询 × 2次 × 30 = 240 点/月)
+    interval_min: 1440   # 每天1次 (advanced 2点 × 1查询 × 1次 × 30 = 60 点/月)
     importance_hint: &hint_pol "突发、重大政策、地缘冲突、选举结果优先；日常政情类降权。"
   - id: politics_x
     name: "时政 / 突发新闻"
@@ -179,8 +178,7 @@ topics:
     max_results: 10
     queries:
       - "AI model release breakthrough"
-      - "OpenAI OR Anthropic OR Google DeepMind OR xAI"
-    interval_min: 720   # 2次/天 (约 240 点/月)
+    interval_min: 1440   # 每天1次 (advanced 2点 × 1查询 × 1次 × 30 = 60 点/月)
     importance_hint: &hint_tech "新模型发布、重大产品、重要论文、巨头战略、重大收购优先。"
   - id: tech_x
     name: "全球科技 / AI 行业新闻"
@@ -205,8 +203,7 @@ topics:
     max_results: 10
     queries:
       - "AI startup funding round OR raises"
-      - "AI unicorn valuation"
-    interval_min: 720   # 2次/天 (约 240 点/月; 三者合计约 720/月 < 800 上限)
+    interval_min: 1440   # 每天1次 (advanced 2点 × 1查询 × 1次 × 30 = 60 点/月)
     importance_hint: &hint_uni "大额融资、新晋独角兽、估值变化、重大并购优先。"
   - id: unicorn_x
     name: "AI 独角兽新闻"
@@ -243,9 +240,7 @@ topics:
     max_results: 10
     queries:
       - "AI free credits promo code"
-      - "free API credits LLM deal"
-      - "OpenAI OR Anthropic OR Google Cloud free AI credits"
-    interval_min: 720
+    interval_min: 1440   # 每天1次 (advanced 2点 × 1查询 × 1次 × 30 = 60 点/月)
     importance_hint: &hint_deals "免费 API 额度、兑换码、云厂商 AI 赠金、限时免费工具、大模型免费福利优先；过期优惠、普通收费软文降权。"
   - id: ai_deals_x
     name: "🎁 AI 羊毛与福利"
