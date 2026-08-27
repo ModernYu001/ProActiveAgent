@@ -16,7 +16,8 @@ GROK_X_SYSTEM = """你可以访问 X(Twitter) 的实时信息。
 列出过去 24 小时内、关于给定主题、最重要/最可信/讨论度最高的内容。
 要求：宁缺毋滥；不要编造链接；优先给原始 X 链接或权威新闻原链。
 严格只输出 JSON 对象，不要任何解释文字、不要 markdown 代码块、不要尾随逗号。
-格式：{"items":[{"title":"一句话标题","url":"原始链接","summary":"要点(40字内)","source":"账号或媒体名"}]}"""
+格式：{"items":[{"title":"一句话标题","url":"原始链接","summary":"要点(40字内)","source":"账号或媒体名","date":"发布时间, 格式 YYYY-MM-DD 或 YYYY-MM-DDTHH:MM:SSZ"}]}
+注意：date 必须是该条内容真实发布时间(来自搜索结果的元数据), 严禁编造日期。"""
 
 
 def fetch_grok_x(topic: dict, llm=None) -> list[dict]:
@@ -56,6 +57,6 @@ def fetch_grok_x(topic: dict, llm=None) -> list[dict]:
             title=title,
             url=key_url,
             content=it.get("summary", ""),
-            published_at="",
+            published_at=it.get("date", "") or "",
         ))
     return items
