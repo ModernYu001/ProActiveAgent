@@ -228,12 +228,14 @@ def cmd_test(cfg, llm):
 def cmd_quota(cfg, llm):
     import os
     from datetime import datetime
+    from proactive.fetchers.tavily_news import _tavily_keys
     store.init_db()
     day = datetime.now().strftime("%Y-%m-%d")
     month = datetime.now().strftime("%Y-%m")
     with store.connect() as conn:
         rows = store.usage_today(conn, day)
-        tav_used = store.get_usage(conn, month, "tavily", "search", 0)
+        tav_used = sum(store.get_usage(conn, month, "tavily", "search", i)
+                       for i in range(len(_tavily_keys())))
     quotas = cfg.get("quotas", {})
     print(f"今日 ({day}) LLM 配额使用：")
     if not rows:
@@ -241,9 +243,11 @@ def cmd_quota(cfg, llm):
     for r in rows:
         limit = quotas.get(r["provider"], {}).get(r["model"], "∞")
         print(f"  {r['provider']:7} {r['model']:24} key#{r['key_idx']}: {r['count']}/{limit}")
-    tav_limit = int(float(os.getenv("TAVILY_MONTHLY_CREDITS", "1000")) *
-                    float(os.getenv("TAVILY_BUDGET_RATIO", "0.8")))
-    print(f"本月 ({month}) Tavily 搜索点数: {tav_used}/{tav_limit} (80%上限)")
+    tav_limit = (int(float(os.getenv("TAVILY_MONTHLY_CREDITS", "1000")) *
+                     float(os.getenv("TAVILY_BUDGET_RATIO", "0.8"))) *
+                 len(_tavily_keys()))
+    print(f"本月 ({month}) Tavily 搜索点数: {tav_used}/{tav_limit} "
+          f"({len(_tavily_keys())} 个 key 合计)")
 
 
 def cmd_feedback(args):

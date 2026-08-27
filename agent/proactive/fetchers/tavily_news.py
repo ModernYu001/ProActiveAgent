@@ -23,17 +23,33 @@ def _monthly_limit() -> int:
     return int(credits * ratio)
 
 
+def _tavily_keys() -> list[str]:
+    """支持多 key 分担：TAVILY_API_KEYS(逗号分隔) 优先, 兼容旧 TAVILY_API_KEY。"""
+    raw = os.getenv("TAVILY_API_KEYS", "").strip() or os.getenv("TAVILY_API_KEY", "").strip()
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
+def _pick_key(month: str, limit: int) -> tuple[str, int]:
+    """返回 (key, key_idx)：本月还有额度的 key 里选用得最少的; 全用尽则 ("", -1)。"""
+    keys = _tavily_keys()
+    with store.connect() as conn:
+        used = [store.get_usage(conn, month, "tavily", "search", i) for i in range(len(keys))]
+    candidates = [(used[i], i) for i in range(len(keys)) if used[i] < limit]
+    if not candidates:
+        return "", -1
+    _, i = min(candidates)
+    return keys[i], i
+
+
 def fetch_tavily(topic: dict, llm=None) -> list[dict]:
-    key = os.getenv("TAVILY_API_KEY", "").strip()
-    if not key:
-        print("[tavily] 未配置 TAVILY_API_KEY, 跳过")
+    keys = _tavily_keys()
+    if not keys:
+        print("[tavily] 未配置 TAVILY_API_KEY(S), 跳过")
         return []
 
-    # 月度额度硬控：每个搜索查询 = 1 点, 到 80% 上限即停, 绝不超
+    # 月度额度硬控：每个查询按 key 单独计数, 到上限即停, 绝不超
     limit = _monthly_limit()
     month = datetime.now().strftime("%Y-%m")
-    with store.connect() as conn:
-        used = store.get_usage(conn, month, "tavily", "search", 0)
 
     days = topic.get("days", 1)
     max_results = topic.get("max_results", 10)
@@ -45,8 +61,9 @@ def fetch_tavily(topic: dict, llm=None) -> list[dict]:
     seen = set()
 
     for q in topic.get("queries", []):
-        if used + cost > limit:
-            print(f"[tavily] 本月额度将超 {used}+{cost}>{limit}(80%上限), 暂停搜索至下月")
+        key, key_idx = _pick_key(month, limit)
+        if not key:
+            print(f"[tavily] 所有 {len(keys)} 个 key 本月额度均已用尽({limit}/key), 暂停搜索至下月")
             break
         body = {
             "api_key": key,
@@ -69,11 +86,10 @@ def fetch_tavily(topic: dict, llm=None) -> list[dict]:
             print(f"[tavily] 请求失败: {e}")
             continue
 
-        # 计额度(basic=1 / advanced=2 点)
-        used += cost
+        # 计额度(basic=1 / advanced=2 点) → 记到实际使用的 key_idx
         with store.connect() as conn:
             for _ in range(cost):
-                store.incr_usage(conn, month, "tavily", "search", 0)
+                store.incr_usage(conn, month, "tavily", "search", key_idx)
 
         for res in results:
             url = res.get("url", "")
