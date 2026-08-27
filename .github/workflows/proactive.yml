@@ -37,7 +37,7 @@ jobs:
           GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
           GROK_BASE_URL: ${{ secrets.GROK_BASE_URL }}
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
-          GROK_MODEL: grok-4.20-fast
+          GROK_MODEL: grok-4.5
           GROK_STREAM: "true"
           GROK_MAX_ATTEMPTS: "6"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # Actions 自带临时 token, 够用于 Search API

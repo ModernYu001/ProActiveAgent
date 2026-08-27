@@ -36,11 +36,12 @@ thresholds:
 # 模型 id 均经 list_models.py 在你账号上实测存在。判断层走 flash-lite(约600/天)，
 # critic 用 2.5-flash(低频)。grok 对话接口暂有问题, 先不入路径(以后修好可做兜底)。
 models:
-  # 判断层（高频、量大）：优选 3.1-flash-lite, 逐级回退
+  # 判断层（高频、量大）：优选 3.5-flash-lite / 3.1-flash-lite, 逐级回退
   judge:
     provider: gemini
-    preferred: gemini-3.1-flash-lite
+    preferred: gemini-3.5-flash-lite
     fallback:
+      - gemini-3.1-flash-lite
       - gemini-2.5-flash-lite
       - gemini-2.5-flash
       - gemini-3-flash-preview
@@ -53,9 +54,9 @@ models:
   # 评判/自省层（低频、要稍强）：grok 主用, gemini 兜底
   critic:
     provider: grok
-    preferred: grok-4.20-fast
+    preferred: grok-4.5
     fallback:
-      - grok-4.20-0309-non-reasoning   # 同 provider 回退
+      - grok-4.6   # 同 provider 回退
     fallback_provider: gemini
     fallback_models:                   # grok 全挂了再用 gemini
       - gemini-2.5-flash
@@ -65,7 +66,8 @@ models:
 # 你有 2 个 Gemini key → flash-lite 实际每天约 600 次；配合批量判断足够高频盯梢。
 quotas:
   gemini:
-    gemini-3.1-flash-lite: 450   # 主力判断 (每 key 500/天, 留余量按 450 → 2 key 约 900/天)
+    gemini-3.5-flash-lite: 450   # 主力判断 (每 key 500/天)
+    gemini-3.1-flash-lite: 450   # 备用主力判断
     gemini-2.5-flash-lite: 100   # 兜底, 配额未确认先保守填
     gemini-2.5-flash: 10         # 稀缺, 给 critic / 兜底
     gemini-3-flash-preview: 10   # 稀缺, 兜底
@@ -75,6 +77,7 @@ quotas:
 # ---- 每分钟限频(RPM)：设计值取实际的 ~2/3 留余量。客户端自动节流 + 429 等待重试 ----
 rate_limits:
   gemini:
+    gemini-3.5-flash-lite: 10
     gemini-3.1-flash-lite: 10    # 实际 15
     gemini-2.5-flash-lite: 10
     gemini-2.5-flash: 3          # 实际 5

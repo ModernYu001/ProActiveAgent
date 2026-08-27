@@ -219,6 +219,7 @@ class LLMClient:
         r = requests.post(url, json=body, headers=headers, timeout=self.timeout, stream=True)
         if r.status_code != 200:
             raise LLMError(f"HTTP {r.status_code}: {r.text[:200]}")
+        r.encoding = "utf-8"   # 代理未声明 charset 时 requests 默认 latin-1, 会乱码
         parts = []
         for line in r.iter_lines(decode_unicode=True):
             if not line:

@@ -26,8 +26,8 @@ def fetch_grok_x(topic: dict, llm=None) -> list[dict]:
     hint = topic.get("importance_hint", "")
     route = {
         "provider": "grok",
-        "preferred": os.getenv("GROK_MODEL", "grok-4.20-fast"),
-        "fallback": ["grok-4.20-0309-non-reasoning"],
+        "preferred": os.getenv("GROK_MODEL", "grok-4.5"),
+        "fallback": ["grok-4.6"],
     }
     user = (f"主题/关键词：{queries}\n额外侧重：{hint}\n"
             f"最多 {n} 条，按重要性排序。")

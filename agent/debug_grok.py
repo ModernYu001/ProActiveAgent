@@ -14,7 +14,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 BASE = os.getenv("GROK_BASE_URL", "").rstrip("/")
 KEY = os.getenv("GROK_API_KEY", "")
-MODEL = os.getenv("GROK_MODEL", "grok-4.20-fast")
+MODEL = os.getenv("GROK_MODEL", "grok-4.5")
 H = {"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"}
 
 SYS = ('你可以访问 X(Twitter) 实时信息。列出过去 24 小时关于 "AI breaking news" 最重要的内容。'
@@ -75,4 +75,4 @@ if __name__ == "__main__":
     nonstream([{"role": "system", "content": SYS}, {"role": "user", "content": USER}], MODEL, 3000,
               "③ grok_x 同款·非流式看原始body")
     stream([{"role": "system", "content": SYS}, {"role": "user", "content": USER}],
-           "grok-4.20-0309-non-reasoning", 3000, "④ 换 non-reasoning 模型")
+           "grok-4.6", 3000, "④ 换备用模型 grok-4.6")
