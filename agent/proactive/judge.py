@@ -6,6 +6,51 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+
+
+def _parse_date(s: str):
+    """解析常见日期格式 → datetime(UTC)；失败返回 None。"""
+    if not s:
+        return None
+    s = str(s).strip()
+    try:
+        # ISO 8601: 2026-08-27 或 2026-08-27T10:00:00Z
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        pass
+    try:
+        # RFC 2822: Thu, 27 Aug 2026 11:34:57 GMT
+        return parsedate_to_datetime(s)
+    except Exception:
+        return None
+
+
+def _is_fresh(pub: datetime, max_age_days: int = 3) -> bool:
+    """发布时间距今 ≤ max_age_days 天 → 新鲜; 无日期或太旧 → 不新鲜。"""
+    if pub is None:
+        return False
+    if pub.tzinfo is None:
+        pub = pub.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - pub).total_seconds()
+    return 0 <= age <= max_age_days * 86400 + 3600   # 容忍 1h 时钟偏差
+
+
+def hard_filter(item: dict, topic: dict) -> bool:
+    """返回 True 表示直接淘汰(不进 LLM)，省调用。"""
+    title = (item.get("title") or "").lower()
+    if len(title) < 6:
+        return True
+    spam = ["sponsored", "推广", "广告", "coupon", "discount code", "best deals"]
+    if any(s in title for s in spam):
+        return True
+    # 时效硬规则：无日期或超过 max_age_days 的条目直接淘汰(旧闻/编造一律不要)
+    pub = _parse_date(item.get("published_at"))
+    if not _is_fresh(pub):
+        return True
+    return False
+
 
 JUDGE_SYSTEM = """你是一个资讯重要性评判官，为一位有明确关注画像的用户把关。
 你的唯一目标：只让"用户真的想第一时间知道"的条目通过，宁缺毋滥。
@@ -17,15 +62,6 @@ JUDGE_SYSTEM = """你是一个资讯重要性评判官，为一位有明确关�
 - 紧迫性：是否需要"现在"知道(突发要加分)。
 营销软文、标题党、无信息量的内容一律低分(<30)。
 只输出 JSON：{"score": int, "reason": str}"""
-
-
-def hard_filter(item: dict, topic: dict) -> bool:
-    """返回 True 表示直接淘汰(不进 LLM)，省调用。"""
-    title = (item.get("title") or "").lower()
-    if len(title) < 6:
-        return True
-    spam = ["sponsored", "推广", "广告", "coupon", "discount code", "best deals"]
-    return any(s in title for s in spam)
 
 
 def judge_item(llm, route: dict, item: dict, topic: dict, user_profile: str) -> dict:

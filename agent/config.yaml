@@ -159,7 +159,7 @@ topics:
   - id: politics_x
     name: "时政 / 突发新闻"
     type: grok_x
-    enabled: true
+    enabled: false
     max_results: 8
     queries:
       - "breaking political news"
@@ -185,7 +185,7 @@ topics:
   - id: tech_x
     name: "全球科技 / AI 行业新闻"
     type: grok_x
-    enabled: true
+    enabled: false
     max_results: 8
     queries:
       - "AI breaking news"
@@ -211,7 +211,7 @@ topics:
   - id: unicorn_x
     name: "AI 独角兽新闻"
     type: grok_x
-    enabled: true
+    enabled: false
     max_results: 8
     queries:
       - "AI startup funding"
@@ -223,7 +223,7 @@ topics:
   - id: ai_tools_x
     name: "AI 工具玩法 / 案例"
     type: grok_x
-    enabled: true
+    enabled: false
     max_results: 10
     queries:
       - "Claude Code OR Codex OR Gemini CLI tips workflow viral"
@@ -250,7 +250,7 @@ topics:
   - id: ai_deals_x
     name: "🎁 AI 羊毛与福利"
     type: grok_x
-    enabled: true
+    enabled: false
     max_results: 8
     queries:
       - "AI free tier credits promo"
