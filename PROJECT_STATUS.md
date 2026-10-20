@@ -10,7 +10,7 @@
 
 | 模块 | 状态 | 说明 |
 |---|---|---|
-| 采集（4 类源） | ✅ 运行中 | GitHub / Tavily / grok-X 全部跑通 |
+| 采集（5 类源） | ✅ 运行中 | GitHub / Tavily / grok-X / Reddit 全部跑通 |
 | 去重 | ✅ | URL 指纹 + 标题模糊匹配，跨源合并同一事件 |
 | 判断层 | ✅ | **两段式**：批量粗筛 → 读正文深判 |
 | 个性化（越用越懂你）| ✅ | 来源采纳率先验 + 自省重写画像 + 15% 探索名额 |
@@ -27,10 +27,12 @@
 |---|---|---|---|
 | GitHub AI Agent 热点 | GitHub Search API | 12h | **新锐项目 + 星标激增**(非历史最高星) |
 | GitHub AI 陪伴机器人热点 | GitHub Search API | 12h | 主题标签命中(ai-companion/waifu/character-ai 等) + 新锐/激增 |
-| 时政 / 突发 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | advanced 带回正文 |
-| 科技 / AI 行业 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | |
-| AI 独角兽 | Tavily advanced(主) + grok-X(补) | 2次/天 + 每天1次 | |
+| 时政 / 突发 | Tavily advanced(主) + grok-X(补) + Reddit | 2次/天 + 每天1次 | advanced 带回正文；Reddit 盯 r/worldnews 等 |
+| 科技 / AI 行业 | Tavily advanced(主) + grok-X(补) + Reddit | 2次/天 + 每天1次 | Reddit 盯 r/LocalLLaMA, r/singularity 等 |
+| AI 独角兽与投融资 | Tavily advanced(主) + grok-X(补) + Reddit | 2次/天 + 每天1次 | Reddit 盯 r/startups, r/venturecapital 等 |
+| 🎁 AI 羊毛与福利 | Tavily + grok-X + Reddit | 2次/天 | 免费 API 额度、云赠金、兑换码、免费等级 |
 
+- **Reddit 采集器**：支持公开 RSS 多社区聚合 + 官方 OAuth API + Tavily Reddit 自动兜底（抗反爬、自带正文）。
 - **Tavily advanced** 模式直接带回 `raw_content`（正文），供第二段深判，无需额外抓网页。
 - **grok-X** 经实测可实时访问 X；偶发空响应已加自动重试（最多 3 次，空响应不计配额）。
 
